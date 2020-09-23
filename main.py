@@ -7,7 +7,7 @@ from sys import exit as sys_exit
 
 if len(argv) != 7 or '-s' not in argv or '-l' not in argv or '-p' not in argv:
     print("Неверное число параметров, ожидалось -s 'server' -l 'email' -p 'password'")
-    input('\n=== нажмите любую клавишу ===')
+    input('\n=== нажмите Enter для выхода ===')
     sys_exit()
 
 server = argv[argv.index('-s') + 1]
@@ -62,6 +62,6 @@ else:
     else:
         print('Ссылки на сегодняшние и завтрашние пары не найдены')
 finally:
-    input('\n=== нажмите любую клавишу для выхода ===')
+    input('\n=== нажмите Enter для выхода ===')
 
 # pyinstaller --onefile main.py
