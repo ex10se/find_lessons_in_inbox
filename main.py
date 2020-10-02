@@ -5,17 +5,23 @@ from email import utils, message_from_string
 from sys import argv
 from sys import exit as sys_exit
 from os import system as os_system
+from sys import platform
 
-os_system("mode con cols=150 lines=30")  # размеры окна
 
+# размеры окна
+if platform == 'win32':
+    os_system("mode con cols=150 lines=30")
+
+# проверка параметров
 if len(argv) != 7 or '-s' not in argv or '-l' not in argv or '-p' not in argv:
     print("Неверное число параметров, ожидалось -s 'server' -l 'email' -p 'password'")
     input('\n=== нажмите Enter для выхода ===')
     sys_exit()
-
+# разбор параметров по переменным
 server = argv[argv.index('-s') + 1]
 login = argv[argv.index('-l') + 1]
 password = argv[argv.index('-p') + 1]
+
 
 try:
     imap = IMAP4_SSL('imap.' + server)
@@ -65,6 +71,6 @@ else:
     else:
         print('Ссылки на сегодняшние и завтрашние пары не найдены')
 finally:
-    input('\n=== нажмите Enter для выхода ===')
+    input('=== нажмите Enter для выхода ===')
 
 # pyinstaller --onefile main.py
