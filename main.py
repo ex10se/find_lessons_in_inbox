@@ -4,6 +4,9 @@ from datetime import datetime, timedelta
 from email import utils, message_from_string
 from sys import argv
 from sys import exit as sys_exit
+from os import system as os_system
+
+os_system("mode con cols=150 lines=30")  # размеры окна
 
 if len(argv) != 7 or '-s' not in argv or '-l' not in argv or '-p' not in argv:
     print("Неверное число параметров, ожидалось -s 'server' -l 'email' -p 'password'")
@@ -17,7 +20,7 @@ password = argv[argv.index('-p') + 1]
 try:
     imap = IMAP4_SSL('imap.' + server)
     imap.login(login, password)
-    print('Авторизация успешна')
+    print('Авторизация успешна, поиск...\n')
     imap.select("inbox")
 
     _, data = imap.search(None, 'ALL')
@@ -58,7 +61,7 @@ except Exception as exc:
         print(f'Неверный email или пароль ({exc})')
 else:
     if is_lessons_found:
-        print('Скопируйте нужную ссылку в буфер обмена')
+        print('\nСкопируйте нужную ссылку в буфер обмена')
     else:
         print('Ссылки на сегодняшние и завтрашние пары не найдены')
 finally:
