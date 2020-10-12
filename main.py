@@ -22,11 +22,16 @@ login = argv[argv.index('-l') + 1]
 password = argv[argv.index('-p') + 1]
 
 current_date = datetime.today()
+days_ahead = argv.index('-d') + 1 if '-d' in argv else 2  # на сколько дней вперёд
+dates = [current_date]
+dates.extend([current_date + timedelta(days=i) for i in range(1, days_ahead + 1)])
+for date in dates:
+    dates[dates.index(date)] = date.strftime("%d.%m.%Y")
+
 are_lessons_found = False
 subject_types = {'Лекция': 'лекция',
                  'Практическое занятие': 'практика',
                  'Лабораторное занятие': 'лаба'}
-days_ahead = argv.index('-d') + 1 if '-d' in argv else 2  # на сколько дней вперёд
 count = 50  # сколько писем проверять от последнего
 
 try:
@@ -47,9 +52,7 @@ try:
         sender = utils.parseaddr(message_from_string(raw_email)['From'])[1]
         if sender == 'process@isu.ifmo.ru':
 
-            for date in (current_date, current_date + timedelta(days=days_ahead)):
-                date = date.strftime("%d.%m.%Y")
-
+            for date in dates:
                 current_date_index = raw_email.find(date)
                 if raw_email.find(date) != -1:  # если нашлась текущая дата цикла
                     are_lessons_found = True
