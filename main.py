@@ -1,90 +1,98 @@
-from imaplib import IMAP4_SSL
-from re import search as re_search
+import email
+import re
 from datetime import datetime, timedelta
-from email import utils, message_from_string
+from email.header import decode_header
+from imaplib import IMAP4_SSL
 from sys import argv
-from sys import exit as sys_exit
-from os import system as os_system
+import pandas as pd
+import os
 from sys import platform
 
 # размеры окна
 if platform == 'win32':
-    os_system("mode con cols=150 lines=30")
+    os.system("mode con cols=150 lines=20")
 
 # проверка параметров
-if len(argv) < 7 or '-s' not in argv or '-l' not in argv or '-p' not in argv:
-    print("Неверное число параметров, ожидалось -s 'server' -l 'email' -p 'password'")
+if len(argv) < 7 or '-s' not in argv or '-e' not in argv or '-p' not in argv:
+    print("Неверное число параметров, ожидалось -s 'server' -e 'email' -p 'password'")
     input('\n=== нажмите Enter для выхода ===')
-    sys_exit()
+    exit()
 # разбор параметров
-server = argv[argv.index('-s') + 1]
-login = argv[argv.index('-l') + 1]
-password = argv[argv.index('-p') + 1]
+SERVER = argv[argv.index('-s') + 1]
+EMAIL = argv[argv.index('-e') + 1]
+PASSWORD = argv[argv.index('-p') + 1]
 
-current_date = datetime.today()
-days_ahead = argv.index('-d') + 1 if '-d' in argv else 2  # на сколько дней вперёд
-dates = [current_date]
-dates.extend([current_date + timedelta(days=i) for i in range(1, days_ahead + 1)])
-for date in dates:
-    dates[dates.index(date)] = date.strftime("%d.%m.%Y")
+DAYS_AHEAD = argv.index('-d') + 1 if '-d' in argv else 3  # на сколько дней вперёд
 
+dates = [(datetime.today() + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(0, DAYS_AHEAD + 1)]
 are_lessons_found = False
-subject_types = {'Лекция': 'лекция',
-                 'Практическое занятие': 'практика',
-                 'Лабораторное занятие': 'лаба'}
 count = 50  # сколько писем проверять от последнего
+result_rows = []
 
-try:
-    imap = IMAP4_SSL('imap.' + server)
-    imap.login(login, password)
-    print('Авторизация успешна, поиск...\n')
-    imap.select("inbox")
+subject_types = {
+    'Практическое занятие': 'Практика',
+    'Лабораторное занятие': 'Лаба',
+}
 
-    _, data = imap.search(None, 'ALL')
-    ids = data[0]  # Получаем строку номеров писем
-    id_list = ids.split()  # Разделяем ID писем
 
-    for i in range(1, count):
-        email_id = id_list[-i]
-        _, data = imap.fetch(email_id, "(RFC822)")
-        raw_email = data[0][1].decode('utf-8')
+def decompose_letter(body: str):
+    lesson_date = re.search(r'(?<=состоится\s).*?(?=\s)', body).group()
+    return {
+        'Дата': lesson_date,
+        'Время': re.search(r'(?<={} ).*?(?=\sв)'.format(re.escape(lesson_date)), body).group(),
+        'Тип': re.search(r'(?<=Вас,\sчто\s)[\w\W]*?(?=\sпо)', body).group(),
+        'Предмет': re.search(r'(?<=по\sдисциплине\s).*?(?=,)', body).group(),
+        'Ссылка': re.search(r'(?<=Вы\sможете\sпо\s<a\shref=").*?(?="\s)', body).group(),
+    }
 
-        sender = utils.parseaddr(message_from_string(raw_email)['From'])[1]
-        if sender == 'process@isu.ifmo.ru':
 
-            for date in dates:
-                current_date_index = raw_email.find(date)
-                if raw_email.find(date) != -1:  # если нашлась текущая дата цикла
-                    are_lessons_found = True
-                    lesson_time = re_search("([0-1]?[0-9]|2[0-3]):[0-5][0-9]", raw_email[current_date_index:]).group()
-                    link = re_search(r"(?P<url>https?://itmo.zoom[^\s]+)",
-                                     raw_email[current_date_index:]).group("url")[:-1]
-                    subject_start_index = raw_email.find('дисциплине') + len('дисциплине') + 3
-                    subject_end_index = raw_email.find('преподаватель') - 4
-                    subject_name = ' '.join(raw_email[subject_start_index:subject_end_index].split())
+def print_results(rows):
+    df = pd.DataFrame(rows)
+    df.sort_values(by=['Дата', 'Время'], inplace=True)
+    for row in df.values:
+        print(f'{row[0][:-5]} в {row[1]}: '
+              f'{subject_types.get(row[2]) if subject_types.get(row[2]) else row[2]}'  # сокращает тип пары
+              f' по {row[3][:]} {row[4]}')
 
-                    # определяем тип занятия
-                    subject_type = None
-                    for subj_type_raw, subj_type in subject_types.items():
-                        if ' '.join(raw_email.split()).find(subj_type_raw) != -1:
-                            subject_type = subj_type
-                            break
 
-                    print(f'{subject_name} ({subject_type}) {date} в {lesson_time}: {link}')
+if __name__ == '__main__':
+    try:
+        with IMAP4_SSL(f'imap.{SERVER}') as imap:
+            imap.login(EMAIL, PASSWORD)
+            print('Авторизация успешна, поиск...\n')
+            imap.select("inbox")
+            id_list = imap.search(None, 'ALL')[1][0].split()[::-1][:count]
 
-    imap.logout()
+            for email_id in id_list:  # берем по письму, начиная с самого последнего
+                data = imap.fetch(email_id, "(RFC822)")[1][0][1]
+                msg = email.message_from_bytes(data)
 
-except Exception as exc:
-    if str(exc).startswith('[Errno 11001]'):
-        print(f'Неверный адрес сервера ({exc})')
-    elif str(exc).lower().find('authentication') != 0:
-        print(f'Неверный email или пароль ({exc})')
-else:
-    if are_lessons_found:
-        print('\nСкопируйте нужную ссылку в буфер обмена')
+                if msg['Return-path'] == '<process@isu.ifmo.ru>' and \
+                        decode_header(msg['Subject'])[0][0].decode('utf-8') == 'ИСУ ИТМО - Дистанционное обучение':
+                    payload = msg.get_payload()[1].get_payload()  # письмо в сыром виде
+                    body_no_breaks = re.sub(r'^\s+|\n|\r|\s+$', '', payload)  # удаляем переносы строк
+                    letter_details = decompose_letter(body_no_breaks)
+                    if letter_details['Дата'] in dates:
+                        # если дата не сегодняшняя, либо сегодняшняя, но
+                        # между текущим временем и временем пары менее трех часов
+                        if letter_details['Дата'] != dates[0] or \
+                                letter_details['Дата'] == dates[0] and \
+                                datetime.now().hour - datetime.strptime(letter_details['Время'], '%H:%M').hour < 3:
+                            result_rows.append(letter_details)
+                            are_lessons_found = True
+
+    except Exception as exc:
+        if str(exc).startswith('[Errno 11001]'):
+            print(f'Неверный адрес сервера ({exc})')
+        elif str(exc).lower().find('authentication') != 0:
+            print(f'Неверный email или пароль ({exc})')
     else:
-        print('Ссылки на ближайшие пары не найдены')
-finally:
-    input('=== нажмите Enter для выхода ===')
+        if are_lessons_found:
+            print_results(result_rows)
+            print('\nСкопируйте нужную ссылку в буфер обмена')
+        else:
+            print('Ссылки на ближайшие пары не найдены')
+    finally:
+        input('\n=== нажмите Enter для выхода ===')
 
-# pyinstaller --onefile main.py
+    # pyinstaller --onefile main.py
