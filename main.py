@@ -39,7 +39,7 @@ def decompose_letter(body: str):
     lesson_date = re.search(r'(?<=состоится\s).*?(?=\s)', body).group()
     return {
         'Дата': lesson_date,
-        'Время': re.search(r'(?<={} ).*?(?=\sв)'.format(re.escape(lesson_date)), body).group(),
+        'Время': re.search(rf'(?<={re.escape(lesson_date)} ).*?(?=\sв)', body).group(),
         'Тип': re.search(r'(?<=Вас,\sчто\s)[\w\W]*?(?=\sпо)', body).group(),
         'Предмет': re.search(r'(?<=по\sдисциплине\s).*?(?=,)', body).group(),
         'Ссылка': re.search(r'(?<=Вы\sможете\sпо\s<a\shref=").*?(?="\s)', body).group(),
@@ -75,11 +75,18 @@ if __name__ == '__main__':
                     if letter_details['Дата'] in dates:
                         # если дата не сегодняшняя, либо сегодняшняя, но
                         # между текущим временем и временем пары менее трех часов
-                        if letter_details['Дата'] != dates[0] or \
-                                letter_details['Дата'] == dates[0] and \
-                                datetime.now().hour - datetime.strptime(letter_details['Время'], '%H:%M').hour < 3:
-                            result_rows.append(letter_details)
-                            are_lessons_found = True
+                        try:
+                            lesson_time = datetime.strptime(letter_details['Время'], '%H:%M')
+                        except ValueError:
+                            if letter_details['Дата'] != dates[0] or letter_details['Дата'] == dates[0]:
+                                letter_details['Время'] = letter_details['Время'].replace('<b>', '').replace('</b>', '')
+                                result_rows.append(letter_details)
+                                are_lessons_found = True
+                        else:
+                            if letter_details['Дата'] != dates[0] or letter_details['Дата'] == dates[0] and \
+                                    datetime.now().hour - lesson_time.hour < 3:
+                                result_rows.append(letter_details)
+                                are_lessons_found = True
 
     except Exception as exc:
         if str(exc).startswith('[Errno 11001]'):
