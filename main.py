@@ -1,12 +1,13 @@
 import email
+import os
 import re
 from datetime import datetime, timedelta
 from email.header import decode_header
 from imaplib import IMAP4_SSL
 from sys import argv
-import pandas as pd
-import os
 from sys import platform
+
+import pandas as pd
 
 # размеры окна
 if platform == 'win32':
@@ -48,11 +49,21 @@ def decompose_letter(body: str):
 
 def print_results(rows):
     df = pd.DataFrame(rows)
+    df['Дата'] = pd.to_datetime(df['Дата'], dayfirst=True)
     df.sort_values(by=['Дата', 'Время'], inplace=True)
     for row in df.values:
-        print(f'{row[0][:-5]} в {row[1]}: '
+        # сокращение названия предмета
+        subject_name_words = row[3].split(' ')
+        subject_name = ""
+        k = 6  # максимальная длина слов
+        for i in range(len(subject_name_words)):
+            subject_name += f"{subject_name_words[i][:k]}"
+            subject_name += '.' if len(subject_name_words[i]) > 1 else ''
+            subject_name += '' if i + 1 == len(subject_name_words) else ' '
+        # вывод результата
+        print(f'{row[0].strftime("%d.%m")} в {row[1]}: '
               f'{subject_types.get(row[2]) if subject_types.get(row[2]) else row[2]}'  # сокращает тип пары
-              f' по {row[3][:]} {row[4]}')
+              f' по "{subject_name}" {row[4]}')
 
 
 if __name__ == '__main__':
