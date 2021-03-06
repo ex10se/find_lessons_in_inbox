@@ -6,6 +6,7 @@ from email.header import decode_header
 from imaplib import IMAP4_SSL
 from sys import argv
 from sys import platform
+import getpass
 
 import pandas as pd
 
@@ -16,12 +17,15 @@ if platform == 'win32':
 # проверка параметров
 if len(argv) < 7 or '-s' not in argv or '-e' not in argv or '-p' not in argv:
     print("Неверное число параметров, ожидалось -s 'server' -e 'email' -p 'password'")
-    input('\n=== нажмите Enter для выхода ===')
-    exit()
-# разбор параметров
-SERVER = argv[argv.index('-s') + 1]
-EMAIL = argv[argv.index('-e') + 1]
-PASSWORD = argv[argv.index('-p') + 1]
+    print("Закройте программу или введите данные")
+    SERVER = input("Server: ")
+    EMAIL = input("Email: ")
+    PASSWORD = getpass.getpass("Password (no echo): ")
+else:
+    # разбор параметров
+    SERVER = argv[argv.index('-s') + 1]
+    EMAIL = argv[argv.index('-e') + 1]
+    PASSWORD = argv[argv.index('-p') + 1]
 
 DAYS_AHEAD = argv.index('-d') + 1 if '-d' in argv else 3  # на сколько дней вперёд
 
