@@ -27,9 +27,9 @@ else:
     EMAIL = argv[argv.index('-e') + 1]
     PASSWORD = argv[argv.index('-p') + 1]
 
-DAYS_AHEAD = argv.index('-d') + 1 if '-d' in argv else 3  # на сколько дней вперёд
+DAYS_AHEAD = int(argv[argv.index('-d') + 1]) if '-d' in argv else 3  # на сколько дней вперёд
 
-dates = [(datetime.today() + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(0, DAYS_AHEAD + 1)]
+dates = [(datetime.today() + timedelta(days=i)).strftime("%d.%m.%Y") for i in range(DAYS_AHEAD + 1)]
 are_lessons_found = False
 count = 50  # сколько писем проверять от последнего
 result_rows = []
@@ -40,18 +40,21 @@ subject_types = {
 }
 
 
-def decompose_letter(body: str):
+def decompose_letter(body: str) -> dict:
     lesson_date = re.search(r'(?<=состоится\s).*?(?=\s)', body).group()
+    lesson_url = re.search(r'(?<=Вы\sможете\sпо\s<a\shref=").*?(?="\s)', body)
+    if not lesson_url:
+        lesson_url = re.search(r'https://itmo\.zoom\.us/.*?(?=<)', body)
     return {
         'Дата': lesson_date,
         'Время': re.search(rf'(?<={re.escape(lesson_date)} ).*?(?=\sв)', body).group(),
         'Тип': re.search(r'(?<=Вас,\sчто\s)[\w\W]*?(?=\sпо)', body).group(),
         'Предмет': re.search(r'(?<=по\sдисциплине\s).*?(?=,)', body).group(),
-        'Ссылка': re.search(r'(?<=Вы\sможете\sпо\s<a\shref=").*?(?="\s)', body).group(),
+        'Ссылка': lesson_url.group(),
     }
 
 
-def print_results(rows):
+def print_results(rows) -> None:
     df = pd.DataFrame(rows)
     df['Дата'] = pd.to_datetime(df['Дата'], dayfirst=True)
     df.sort_values(by=['Дата', 'Время'], inplace=True)
